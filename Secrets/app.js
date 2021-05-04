@@ -3,7 +3,9 @@ const bodyParser = require('body-parser');
 const express = require("express");
 const ejs = require("ejs");
 const mongoose = require('mongoose');
-const md5 = require('md5');
+// const md5 = require('md5');
+const bcrypt = require('bcrypt');
+const saltRounds = 10;
 // var encrypt = require('mongoose-encryption');
 
 mongoose.connect('mongodb://127.0.0.1:27017/userDB', {useNewUrlParser: true, useUnifiedTopology: true});
@@ -37,15 +39,18 @@ app.route('/login')
   })
   .post(function(req, res){
     const username = req.body.username;
-    const pass = md5(req.body.password);
+    const pass = req.body.password;
     
     User.findOne({email:username}, function(err, foundUser){
       if(err) return err
       
       if(foundUser){
-        if(foundUser.password===pass){
-          return res.render('secrets')
-        }
+        bcrypt.compare(pass, foundUser.password, function(err, result) {
+          // result == true
+          if(err) return err
+          if(result) return res.render('secrets')
+          return res.render('login')
+      });
       }
     })
   })
@@ -60,18 +65,24 @@ app.route('/register')
   return res.render('register')
 })
 .post(function(req, res){
+
   const email = req.body.username;
   const password = req.body.password;
 
-  const newUser = new User({
-    email:email,
-    password: md5(password)
+  bcrypt.hash(password, saltRounds, function(err, hash) {
+    // Store hash in your password DB.
+    const newUser = new User({
+      email:email,
+      password: hash
+    })
+  
+  newUser.save(function(err){
+    if(err) return err
+    return res.redirect('secrets')
   })
+    
+  });
 
-newUser.save(function(err){
-  if(err) return err
-  return res.redirect('secrets')
-})
   
 });
 
